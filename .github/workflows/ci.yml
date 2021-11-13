@@ -1,0 +1,124 @@
+name: "CI Pipeline"
+on:
+  push:
+    branches:
+      - '*'
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+      - 'images/**'
+    tags-ignore:
+      - '*'
+  pull_request:
+    branches:
+      - develop
+    paths-ignore:
+      - '*.md'
+      - 'LICENSE'
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v2
+      - name: "Use Node.js 14"
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+          cache: npm
+      - name: "Install application"
+        run: npm install --ignore-scripts
+      - name: "Lint code"
+        run: npm run lint
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [12, 14, 15]
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v2
+      - name: "Use Node.js ${{ matrix.node-version }}"
+        uses: actions/setup-node@v2
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: npm
+      - name: "Cache Node.js modules"
+        uses: actions/cache@v2
+        with:
+          path: ~/.npm
+          key: ${{ runner.OS }}-node-${{ hashFiles('**/package.json') }}
+          restore-keys: |
+            ${{ runner.OS }}-node-
+            ${{ runner.OS }}-
+      - name: "Install application"
+        run: npm install
+      - name: "Execute unit tests"
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 2
+          max_attempts: 3
+          command: npm test
+      - name: "Execute e2e tests"
+        uses: nick-invision/retry@v2
+        with:
+          timeout_minutes: 15
+          max_attempts: 3
+          command: npm run e2e
+      - name: "Prepare coverage data"
+        run: npm run coverage
+      - name: "Publish coverage to Coveralls"
+        if: github.event_name == 'push' && matrix.node-version == '14'
+        uses: coverallsapp/github-action@master
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path-to-lcov: ./build/reports/coverage/lcov.info
+  docker:
+    if: github.event_name == 'push' && (github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/master')
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Check out Git repository"
+        uses: actions/checkout@v2
+      - name: "Set up QEMU"
+        uses: docker/setup-qemu-action@v1
+      - name: "Set up Docker Buildx"
+        uses: docker/setup-buildx-action@v1
+      - name: "Login to DockerHub"
+        uses: docker/login-action@v1
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+      - name: "Set tag & labels for ${{ github.ref }}"
+        run: |
+          if [ "$GITHUB_REF" == "refs/heads/master" ]; then
+          echo "DOCKER_TAG=latest" >> $GITHUB_ENV
+          else
+          echo "DOCKER_TAG=snapshot" >> $GITHUB_ENV
+          fi
+          echo "VCS_REF=`git rev-parse --short HEAD`" >> $GITHUB_ENV
+          echo "BUILD_DATE=`date -u +”%Y-%m-%dT%H:%M:%SZ”`" >> $GITHUB_ENV
+      - name: "Build and push"
+        uses: docker/build-push-action@v2
+        with:
+          context: .
+          file: ./Dockerfile
+          platforms: linux/amd64,linux/arm/v7,linux/arm64
+          push: true
+          tags: |
+            bkimminich/juice-shop-ctf:${{ env.DOCKER_TAG }}
+          build-args: |
+            VCS_REF=${{ env.VCS_REF }}
+            BUILD_DATE=${{ env.BUILD_DATE }}
+  notify-slack:
+    if: github.event_name == 'push' && (success() || failure())
+    needs:
+      - lint
+      - docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: "Slack workflow notification"
+        uses: Gamesight/slack-workflow-status@master
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          slack_webhook_url: ${{ secrets.SLACK_WEBHOOK_URL }}

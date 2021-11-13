@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2016-2021 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * SPDX-License-Identifier: MIT
+ */
+
 const chai = require('chai')
 const expect = chai.expect
 const calculateHintCost = require('../../lib/calculateHintCost')

@@ -1,8 +1,14 @@
+/*
+ * Copyright (c) 2016-2021 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * SPDX-License-Identifier: MIT
+ */
+
+require('colors') // no assignment necessary as this module extends the String prototype
 const inquirer = require('inquirer')
-const colors = require('colors') // eslint-disable-line no-unused-vars
 const fetchSecretKey = require('./lib/fetchSecretKey')
 const fetchChallenges = require('./lib/fetchChallenges')
 const fetchCountryMapping = require('./lib/fetchCountryMapping')
+const fetchCodeSnippets = require('./lib/fetchCodeSnippets')
 const readConfigStream = require('./lib/readConfigStream')
 const fs = require('fs')
 const options = require('./lib/options')
@@ -26,7 +32,7 @@ const questions = [
     type: 'list',
     name: 'ctfFramework',
     message: 'CTF framework to generate data for?',
-    choices: [options.ctfd2Framework, options.ctfdFramework, options.fbctfFramework],
+    choices: [options.ctfdFramework, options.fbctfFramework, options.rtbFramework],
     default: 0
   },
   {
@@ -61,6 +67,13 @@ const questions = [
     message: 'Insert a hint URL along with each challenge?',
     choices: [options.noHintUrls, options.freeHintUrls, options.paidHintUrls],
     default: 0
+  },
+  {
+    type: 'list',
+    name: 'insertHintSnippets',
+    message: 'Insert a code snippet as hint for each challenge?',
+    choices: [options.noHintSnippets, options.freeHintSnippets, options.paidHintSnippets],
+    default: 0
   }
 ]
 
@@ -73,34 +86,38 @@ function getConfig (argv, questions) {
 
 const juiceShopCtfCli = async () => {
   console.log()
-  console.log('Generate ' + 'OWASP Juice Shop'.bold + ' challenge archive for setting up ' + options.ctfdFramework.bold + ', ' + options.ctfd2Framework.bold + ' or ' + options.fbctfFramework.bold + ' score server')
+  console.log(`Generate ${'OWASP Juice Shop'.bold} challenge archive for setting up ${options.ctfdFramework.bold} 2.x, ${options.fbctfFramework.bold} or ${options.rtbFramework.bold} score server`)
 
   try {
     const answers = await getConfig(argv, questions)
 
     console.log()
 
-    const [fetchedSecretKey, challenges, countryMapping] = await Promise.all([
+    const [fetchedSecretKey, challenges, countryMapping, vulnSnippets] = await Promise.all([
       fetchSecretKey(answers.ctfKey),
       fetchChallenges(answers.juiceShopUrl),
-      fetchCountryMapping(answers.countryMapping)
+      fetchCountryMapping(answers.countryMapping),
+      fetchCodeSnippets(answers.juiceShopUrl, answers.insertHintSnippets === options.noHintSnippets)
     ])
 
     await generateCtfExport(answers.ctfFramework || options.ctfdFramework, challenges, {
+      juiceShopUrl: answers.juiceShopUrl,
       insertHints: answers.insertHints,
       insertHintUrls: answers.insertHintUrls,
+      insertHintSnippets: answers.insertHintSnippets,
       ctfKey: fetchedSecretKey,
       countryMapping,
+      vulnSnippets,
       outputLocation: argv.output
     })
     console.log()
     if (!challenges[0].hint && answers.insertHints !== options.noTextHints) {
       console.log('You selected text hints but '.yellow + answers.juiceShopUrl + ' API response did not contain any!'.yellow)
-      console.log('Make sure that the server uses '.yellow + 'default.yml' + ' or has '.yellow + 'showChallengeHints: true' + ' in its config.'.yellow)
+      console.log('Make sure that the server uses '.yellow + 'default.yml' + ' or has '.yellow + 'challenges.showHints: true' + ' in its config.'.yellow)
     }
     if (!challenges[0].hintUrl && answers.insertHintUrls !== options.noHintUrls) {
       console.log('You selected hint URLs but '.yellow + answers.juiceShopUrl + ' API response did not contain any!'.yellow)
-      console.log('Make sure that the server uses '.yellow + 'default.yml' + ' or has '.yellow + 'showChallengeHints: true' + ' in its config.'.yellow)
+      console.log('Make sure that the server uses '.yellow + 'default.yml' + ' or has '.yellow + 'challenges.showHints: true' + ' in its config.'.yellow)
     }
   } catch (error) {
     console.log(error.message.red)

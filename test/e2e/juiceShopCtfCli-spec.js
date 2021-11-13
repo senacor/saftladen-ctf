@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2016-2021 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * SPDX-License-Identifier: MIT
+ */
+
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
 const expect = chai.expect
@@ -8,15 +13,15 @@ const DOWN = inquirer.DOWN
 const fs = require('fs')
 const path = require('path')
 const dateFormat = require('dateformat')
-const outputFile = 'OWASP_Juice_Shop.' + dateFormat(new Date(), 'yyyy-mm-dd') + '.CTFd2.zip'
+const outputFile = 'OWASP_Juice_Shop.' + dateFormat(new Date(), 'yyyy-mm-dd') + '.CTFd.zip'
 const desiredCtfdOutputFile = './output.zip'
-const desiredCtfd2OutputFile = './output2.zip'
 const desiredFbctfOutputFile = './output.json'
+const desiredRtbOutputFile = './output.xml'
 const configFile = 'config.yml'
 const util = require('util')
 const execFile = util.promisify(require('child_process').execFile)
 
-const TIMEOUT = 20000
+const TIMEOUT = 45000
 const juiceShopCtfCli = [path.join(__dirname, '../../bin/juice-shop-ctf.js')]
 
 function cleanup () {
@@ -26,11 +31,14 @@ function cleanup () {
   if (fs.existsSync(configFile)) {
     fs.unlinkSync(configFile)
   }
-  if (fs.existsSync(desiredCtfd2OutputFile)) {
-    fs.unlinkSync(desiredCtfd2OutputFile)
+  if (fs.existsSync(desiredCtfdOutputFile)) {
+    fs.unlinkSync(desiredCtfdOutputFile)
   }
   if (fs.existsSync(desiredFbctfOutputFile)) {
     fs.unlinkSync(desiredFbctfOutputFile)
+  }
+  if (fs.existsSync(desiredRtbOutputFile)) {
+    fs.unlinkSync(desiredRtbOutputFile)
   }
 }
 
@@ -40,65 +48,59 @@ describe('juice-shop-ctf', () => {
 
   it('should accept defaults for all input questions', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, ENTER], 2000)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/Backup archive written to /i).and
       .eventually.match(/Insert a text hint along with each challenge\? No text hints/i).and
-      .eventually.match(/Insert a hint URL along with each challenge\? No hint URLs/i)
+      .eventually.match(/Insert a hint URL along with each challenge\? No hint URLs/i).and
+      .eventually.match(/Insert a code snippet as hint for each challenge\? No hint snippets/i)
   })
 
   it('should insert free hints when chosen', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, DOWN, ENTER, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, DOWN, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/Insert a text hint along with each challenge\? Free text hints/i)
   })
 
   it('should insert paid hints when chosen', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, DOWN, DOWN, ENTER, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, DOWN, DOWN, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/Insert a text hint along with each challenge\? Paid text hints/i)
   })
 
   it('should insert free hint URLs when chosen', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, DOWN, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, DOWN, ENTER, ENTER], 2000)).to
       .eventually.match(/Insert a hint URL along with each challenge\? Free hint URLs/i)
   })
 
   it('should insert paid hint URLs when chosen', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, DOWN, DOWN, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, DOWN, DOWN, ENTER, ENTER], 2000)).to
       .eventually.match(/Insert a hint URL along with each challenge\? Paid hint URLs/i)
   })
 
   it('should fail on invalid Juice Shop URL', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, 'localhorst', ENTER, ENTER, ENTER, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, 'localhorst', ENTER, ENTER, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/Failed to fetch challenges from API!/i)
   })
 
   it('should fail on invalid ctf.key URL', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, 'httpx://invalid/ctf-key', ENTER, ENTER, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, 'httpx://invalid/ctf-key', ENTER, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/Failed to fetch secret key from URL!/i)
-  })
-
-  it('should generate a CTFd 1.x export when choosen', function () {
-    this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [DOWN, ENTER, ENTER, ENTER, ENTER, ENTER], 1500)).to
-      .eventually.match(/CTF framework to generate data for\? CTFd 1.x/i)
   })
 
   it('should generate a FBCTF export when choosen', function () {
     this.timeout(TIMEOUT)
-    return expect(run(juiceShopCtfCli, [DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, ENTER], 1500)).to
+    return expect(run(juiceShopCtfCli, [DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER], 2000)).to
       .eventually.match(/CTF framework to generate data for\? FBCTF/i)
   })
 
-  it('should fail when output file cannot be written', function () {
+  it('should generate a RootTheBox export when choosen', function () {
     this.timeout(TIMEOUT)
-    fs.openSync(outputFile, 'w', 0)
-    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, ENTER], 1500)).to
-      .eventually.match(/Failed to write output to file!/i)
+    return expect(run(juiceShopCtfCli, [DOWN, DOWN, ENTER, ENTER, ENTER, ENTER, ENTER, ENTER], 1500)).to
+      .eventually.match(/CTF framework to generate data for\? RootTheBox/i)
   })
 
   it('should accept a config file', function () {
@@ -106,10 +108,11 @@ describe('juice-shop-ctf', () => {
 juiceShopUrl: https://juice-shop.herokuapp.com
 ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 insertHints: paid
-insertHintUrls: paid`)
+insertHintUrls: paid
+insertHintSnippets: paid`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
       .eventually.match(/Backup archive written to /i)
   })
 
@@ -120,7 +123,7 @@ ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 insertHints`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
       .eventually.match(/can not read /i)
   })
 
@@ -129,10 +132,11 @@ insertHints`)
 juiceShopUrl: https://juice-shop.herokuapp.com
 ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 insertHints: paid
-insertHintUrls: invalidValue`)
+insertHintUrls: invalidValue
+insertHintSnippets: paid`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile]).then(obj => obj.stdout)).to
       .eventually.match(/"insertHintUrls" must be one of /i)
   })
 
@@ -141,24 +145,26 @@ insertHintUrls: invalidValue`)
 juiceShopUrl: https://juice-shop.herokuapp.com
 ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 insertHints: paid
-insertHintUrls: paid`)
+insertHintUrls: paid
+insertHintSnippets: paid`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredCtfd2OutputFile])
-      .then(() => fs.existsSync(desiredCtfd2OutputFile))).to
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredCtfdOutputFile])
+      .then(() => fs.existsSync(desiredCtfdOutputFile))).to
       .eventually.equal(true)
   })
 
-  it('should be possible to create a CTFd 1.x export with a config file', function () {
+  it('should be possible to create a CTFd export with a config file', function () {
     fs.writeFileSync(configFile, `
-ctfFramework: CTFd 1.x
+ctfFramework: CTFd
 juiceShopUrl: https://juice-shop.herokuapp.com
 ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 insertHints: paid
-insertHintUrls: paid`)
+insertHintUrls: paid
+insertHintSnippets: paid`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredCtfdOutputFile])
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredCtfdOutputFile])
       .then(() => fs.existsSync(desiredCtfdOutputFile))).to
       .eventually.equal(true)
   })
@@ -169,11 +175,35 @@ ctfFramework: FBCTF
 juiceShopUrl: https://juice-shop.herokuapp.com
 ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
 countryMapping: https://raw.githubusercontent.com/bkimminich/juice-shop/master/config/fbctf.yml
-insertHints: paid`)
+insertHints: paid
+insertHintUrls: paid
+insertHintSnippets: paid`)
 
     this.timeout(TIMEOUT)
-    return expect(execFile('npx', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredFbctfOutputFile])
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredFbctfOutputFile])
       .then(() => fs.existsSync(desiredFbctfOutputFile))).to
       .eventually.equal(true)
+  })
+
+  it('should be possible to create a RootTheBox export with a config file', function () {
+    fs.writeFileSync(configFile, `
+ctfFramework: RootTheBox
+juiceShopUrl: https://juice-shop.herokuapp.com
+ctfKey: https://raw.githubusercontent.com/bkimminich/juice-shop/master/ctf.key
+insertHints: paid
+insertHintUrls: paid
+insertHintSnippets: paid`)
+
+    this.timeout(TIMEOUT)
+    return expect(execFile('node', [juiceShopCtfCli[0], '--config', configFile, '--output', desiredRtbOutputFile])
+      .then(() => fs.existsSync(desiredRtbOutputFile))).to
+      .eventually.equal(true)
+  })
+
+  it('should fail when output file cannot be written', function () {
+    this.timeout(TIMEOUT)
+    fs.openSync(outputFile, 'w', 0)
+    return expect(run(juiceShopCtfCli, [ENTER, ENTER, ENTER, ENTER, ENTER, ENTER], 2000)).to
+      .eventually.match(/Failed to write output to file!/i)
   })
 })

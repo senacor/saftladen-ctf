@@ -1,3 +1,8 @@
+/*
+ * Copyright (c) 2016-2021 Bjoern Kimminich & the OWASP Juice Shop contributors.
+ * SPDX-License-Identifier: MIT
+ */
+
 const Promise = require('bluebird')
 const chai = require('chai')
 chai.use(require('chai-as-promised'))
@@ -24,5 +29,10 @@ describe('Secret key', () => {
       }
     })
     return expect(fetchSecretKey('http://localh_%&$§rst:3000')).to.be.rejectedWith('Failed to fetch secret key from URL! Argh!')
+  })
+
+  it('should be exactly the given input for empty values', () => {
+    expect(fetchSecretKey(undefined)).to.eventually.equal(undefined)
+    expect(fetchSecretKey(null)).to.eventually.equal(null)
   })
 })
